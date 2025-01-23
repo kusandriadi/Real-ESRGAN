@@ -1,9 +1,9 @@
 numpy
 opencv-python
 Pillow
-torch==2.2.0
-torchvision==0.17.0
-torchaudio==2.2.0
+torch==2.5.1+cu118
+torchvision==0.20.1+cu118
+torchaudio==2.5.1+cu118
 tqdm
 huggingface-hub
 line_profiler
