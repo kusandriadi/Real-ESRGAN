@@ -1,13 +1,13 @@
-import datetime
 import os
 import re
 import time
 
+import numpy as np
 import torch
-from PIL import Image
 
 import version
 from RealESRGAN import RealESRGAN
+from RealESRGAN.process.upscale import upscale
 from metrics.computation import monitor_system_metrics, calculate_average_metrics
 
 
@@ -17,7 +17,7 @@ def main() -> int:
     start_time = time.time()
 
     # Loop melalui semua file weight
-    weight_files = [f for f in os.listdir('weights') if f.endswith('.pth')]
+    weight_files = [f for f in os.listdir('weights') if f.endswith('.pth') and not f.startswith('1')]
 
     for weight_file in weight_files:
         # Ekstrak scale dari nama file weight
@@ -34,7 +34,6 @@ def main() -> int:
         print("=====================================================")
 
         # Buat nama file log berdasarkan waktu saat ini dan parameter
-        log_time = datetime.datetime.now().strftime("%d%m%y_%H%M")
         log_file_path = f"{output_folder}/log_{weight_file.split('.')[0]}.log"
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -43,20 +42,23 @@ def main() -> int:
 
         monitor_start_time, collect_metrics, metrics = monitor_system_metrics()
 
+        psnr_values = []
+
         with open(log_file_path, "w") as log_file:
-            for i, image_file in enumerate(os.listdir("inputs")):
-                image_name, _ = os.path.splitext(image_file)
-                image_path = f"inputs/{image_file}"
-                image = Image.open(image_path).convert('RGB')
+            # Loop melalui semua folder di dalam inputs/lr
+            for dataset in os.listdir("inputs/lr"):
+                if dataset.startswith("1"):
+                    continue  # Abaikan folder yang namanya dimulai dengan '1'
 
-                # Mulai monitoring sebelum prediksi
-                collect_metrics()
-                result_image = model.predict(image)
-                result_path = f"{output_folder}/{image_name}.png"
-                result_image.save(result_path)
-                collect_metrics()
+                dataset_path = os.path.join("inputs/lr", dataset)
+                if not os.path.isdir(dataset_path):
+                    continue
 
-                print(f"Saved result for {image_file} to {result_path}")
+                # Call the upscale function
+                upscale(dataset_path, output_folder, dataset, model, collect_metrics, psnr_values)
+
+            # Hitung rata-rata PSNR
+            avg_psnr = np.mean(psnr_values) if psnr_values else float('nan')
 
             # Hitung rata-rata metrik setelah semua gambar diproses
             avg_metrics = calculate_average_metrics(metrics)
@@ -65,12 +67,17 @@ def main() -> int:
             total_time = time.time() - start_time
 
             # Tulis hasil ke log file
+            log_file.write("\nHitung Metriks Gambar:\n")
+            log_file.write(f"PSNR: {avg_psnr:.2f}\n")
             log_file.write("\nRata-rata penggunaan sistem selama proses:\n")
             log_file.write(f"CPU: {avg_metrics['avg_cpu']:.2f}%\n")
             log_file.write(f"RAM: {avg_metrics['avg_ram_percent']:.2f}% ({avg_metrics['avg_ram_used_mb']:.2f} MB)\n")
             log_file.write(f"GPU: {avg_metrics['avg_gpu_percent']:.2f}%\n")
             log_file.write(f"Memori GPU: {avg_metrics['avg_gpu_memory_percent']:.2f}% ({avg_metrics['avg_gpu_memory_used_mb']:.2f} MB)\n")
             log_file.write(f"Waktu total: {total_time:.2f} detik\n")
+
+        print("\nMetriks gambar adalah:")
+        print(f"PSNR: {avg_psnr:.2f}")
 
         print("\nRata-rata penggunaan sistem selama proses:")
         print(f"CPU: {avg_metrics['avg_cpu']:.2f}%")
