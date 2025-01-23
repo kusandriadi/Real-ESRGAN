@@ -35,7 +35,7 @@ def main() -> int:
 
         # Buat nama file log berdasarkan waktu saat ini dan parameter
         log_time = datetime.datetime.now().strftime("%d%m%y_%H%M")
-        log_file_path = f"{output_folder}/log_{log_time}.log"
+        log_file_path = f"{output_folder}/log_{weight_file.split('.')[0]}.log"
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = RealESRGAN(device, scale=scale)
@@ -52,7 +52,7 @@ def main() -> int:
                 # Mulai monitoring sebelum prediksi
                 collect_metrics()
                 result_image = model.predict(image)
-                result_path = f"{output_folder}/{image_name}_result_{weight_file.split('.')[0]}.png"
+                result_path = f"{output_folder}/{image_name}.png"
                 result_image.save(result_path)
                 collect_metrics()
 
